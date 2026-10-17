@@ -12,6 +12,8 @@ Preparation for an OPNsense plugin contribution. The integration provides **VPN 
 
 ## Configuration
 
+For manual installation, upgrading from the combined v1.0 package, WebUI/service checks, an iPhone connectivity test and rollback, see the [German installation and test guide](docs/INSTALLATION.de.md).
+
 Settings include activation, HTTPS server address, site ID, masked secret, log level, MTU and optional UDP port/DNS server. Credentials are required when enabling Newt. Save/apply uses the OPNsense model, configd and templates. Runtime JSON is root-owned with mode 0600; secrets are absent from process arguments.
 
 The model stays at `OPNsense/Newt` in config.xml, preserving the local 1.0 plugin's settings. First-time model migration imports valid standalone JSON settings. Invalid legacy settings are not imported, and their contents are never logged.
