@@ -1,0 +1,3 @@
+bin/newt
+@sample(root,wheel,0600) %%ETCDIR%%/config.json.sample
+@dir(root,wheel,0700) %%ETCDIR%%

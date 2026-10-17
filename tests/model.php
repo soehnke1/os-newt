@@ -1,7 +1,8 @@
 <?php
+
 /* SPDX-License-Identifier: BSD-2-Clause */
 require_once('/usr/local/opnsense/mvc/script/load_phalcon.php');
-require_once(__DIR__ . '/../src/opnsense/mvc/app/models/OPNsense/Newt/Newt.php');
+require_once(__DIR__ . '/../opnsense/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Newt.php');
 
 $model = new \OPNsense\Newt\Newt();
 $model->general->enabled = '1';
@@ -19,7 +20,15 @@ if (count($messages)) {
     }
     exit(1);
 }
-foreach ([['endpoint', 'http://insecure.example'], ['mtu', '1000'], ['port', '70000'], ['dns', 'not-an-ip'], ['siteId', 'bad;id']] as [$field, $value]) {
+foreach (
+    [
+    ['endpoint', 'http://insecure.example'],
+    ['mtu', '1000'],
+    ['port', '70000'],
+    ['dns', 'not-an-ip'],
+    ['siteId', 'bad;id'],
+    ] as [$field, $value]
+) {
     $old = (string)$model->general->$field;
     $model->general->$field = $value;
     if (!count($model->performValidation())) {
@@ -33,3 +42,16 @@ if (count($model->performValidation())) {
     throw new RuntimeException('Empty optional values must be accepted.');
 }
 echo "Model validation checks passed.\n";
+
+$model->general->enabled = '0';
+$model->general->endpoint = '';
+$model->general->siteId = '';
+$model->general->secret = '';
+if (count($model->performValidation(true))) {
+    throw new RuntimeException('A disabled, unconfigured service must be valid.');
+}
+$model->general->enabled = '1';
+if (!count($model->performValidation(true))) {
+    throw new RuntimeException('Enabling the service must require all site credentials.');
+}
+echo "Conditional credential validation checks passed.\n";

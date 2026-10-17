@@ -1,0 +1,175 @@
+diff --git a/net/Makefile b/net/Makefile
+--- a/net/Makefile
++++ b/net/Makefile
+@@ -948,6 +948,7 @@
+     SUBDIR += pacemaker2
+     SUBDIR += packetdrill
+     SUBDIR += packter-agent
++    SUBDIR += pangolin-newt
+     SUBDIR += parpd
+     SUBDIR += pathneck
+     SUBDIR += pbnc
+diff --git a/net/pangolin-newt/Makefile b/net/pangolin-newt/Makefile
+new file mode 100644
+--- /dev/null
++++ b/net/pangolin-newt/Makefile
+@@ -0,0 +1,32 @@
++PORTNAME=	pangolin-newt
++DISTVERSIONPREFIX=	v
++DISTVERSION=	1.18.1
++CATEGORIES=	net security net-vpn
++
++MAINTAINER=	mail@soehnke.de
++COMMENT=	Userspace WireGuard site connector for Pangolin
++WWW=		https://github.com/fosrl/newt
++
++LICENSE=	AGPLv3
++LICENSE_FILE=	${WRKSRC}/LICENSE
++
++RUN_DEPENDS=	ca_root_nss>0:security/ca_root_nss
++
++USES=		go:1.26+,modules
++USE_RC_SUBR=	newt
++
++GO_MODULE=	github.com/fosrl/newt
++GO_TARGET=	.:newt
++GO_LDFLAGS=	-X main.newtVersion=${DISTVERSION} \
++		-X main.newtPlatform=freebsd_${ARCH}
++
++CGO_ENABLED=	0
++
++ETCDIR=		${PREFIX}/etc/newt
++
++post-install:
++	@${MKDIR} ${STAGEDIR}${ETCDIR}
++	${INSTALL_DATA} ${FILESDIR}/config.json.sample \
++		${STAGEDIR}${ETCDIR}/config.json.sample
++
++.include <bsd.port.mk>
+diff --git a/net/pangolin-newt/distinfo b/net/pangolin-newt/distinfo
+new file mode 100644
+--- /dev/null
++++ b/net/pangolin-newt/distinfo
+@@ -0,0 +1,5 @@
++TIMESTAMP = 1792252800
++SHA256 (go/net_pangolin-newt/pangolin-newt-v1.18.1/v1.18.1.mod) = 0769923d44bbf4ec0de8093feb2f0a01564b7f02d261f97be706d15927a06539
++SIZE (go/net_pangolin-newt/pangolin-newt-v1.18.1/v1.18.1.mod) = 3306
++SHA256 (go/net_pangolin-newt/pangolin-newt-v1.18.1/v1.18.1.zip) = f7054e354d978f10c28669b6213f63d2c87fdd9e0d9b01af958ea853ce706a3d
++SIZE (go/net_pangolin-newt/pangolin-newt-v1.18.1/v1.18.1.zip) = 443602
+diff --git a/net/pangolin-newt/files/config.json.sample b/net/pangolin-newt/files/config.json.sample
+new file mode 100644
+--- /dev/null
++++ b/net/pangolin-newt/files/config.json.sample
+@@ -0,0 +1,7 @@
++{
++  "endpoint": "https://pangolin.example.com",
++  "id": "",
++  "secret": "",
++  "logLevel": "INFO",
++  "mtu": 1280
++}
+diff --git a/net/pangolin-newt/files/newt.in b/net/pangolin-newt/files/newt.in
+new file mode 100644
+--- /dev/null
++++ b/net/pangolin-newt/files/newt.in
+@@ -0,0 +1,61 @@
++#!/bin/sh
++# shellcheck disable=SC2034
++
++# Copyright (c) 2026, Söhnke <mail@soehnke.de>
++# All rights reserved.
++#
++# Redistribution and use in source and binary forms, with or without modification,
++# are permitted provided that the following conditions are met:
++# 1. Redistributions of source code must retain the above copyright notice, this
++#    list of conditions and the following disclaimer.
++# 2. Redistributions in binary form must reproduce the above copyright notice,
++#    this list of conditions and the following disclaimer in the documentation
++#    and/or other materials provided with the distribution.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++# IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++# INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++# OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++# OF THE POSSIBILITY OF SUCH DAMAGE.
++
++# PROVIDE: newt
++# REQUIRE: NETWORKING SERVERS
++# KEYWORD: shutdown
++
++# shellcheck source=/dev/null
++. /etc/rc.subr
++
++# rc.subr consumes these service metadata variables.
++name="newt"
++rcvar="newt_enable"
++load_rc_config "$name"
++: "${newt_enable:=NO}"
++
++pidfile="/var/run/newt.pid"
++required_files="%%PREFIX%%/etc/newt/config.json"
++required_dirs="%%PREFIX%%/etc/newt"
++command="/usr/sbin/daemon"
++procname="/usr/sbin/daemon"
++start_precmd="newt_prestart"
++# Stop the supervisor, so an intentional stop cannot respawn Newt.
++# Credentials stay in the config file and do not appear in process arguments.
++command_args="-f -r -R 5 -P ${pidfile} -p /var/run/newt.child.pid -S -T newt %%PREFIX%%/bin/newt --config-file %%PREFIX%%/etc/newt/config.json"
++
++newt_prestart()
++{
++    if [ ! -x %%PREFIX%%/bin/newt ]; then
++        warn "Newt binary missing: %%PREFIX%%/bin/newt"
++        return 1
++    fi
++    if [ "$(/usr/bin/stat -f '%u:%Lp' %%PREFIX%%/etc/newt/config.json)" != "0:600" ]; then
++        warn "Config must belong to root and have mode 600."
++        return 1
++    fi
++}
++
++run_rc_command "$1"
+diff --git a/net/pangolin-newt/files/patch-updates_selfupdate.go b/net/pangolin-newt/files/patch-updates_selfupdate.go
+new file mode 100644
+--- /dev/null
++++ b/net/pangolin-newt/files/patch-updates_selfupdate.go
+@@ -0,0 +1,15 @@
++--- updates/selfupdate.go.orig	1979-11-29 23:00:00 UTC
+++++ updates/selfupdate.go
++@@ -117,6 +117,12 @@ func CheckAndSelfUpdate(cfg SelfUpdateConfig) error {
++ // the function does not return – the process is replaced by the new binary via
++ // syscall.Exec.
++ func CheckAndSelfUpdate(cfg SelfUpdateConfig) error {
+++	// Package-owned binaries must only be replaced through pkg.
+++	if runtime.GOOS == "freebsd" {
+++		logger.Debug("checkAndSelfUpdate: updates are managed by pkg on FreeBSD")
+++		return nil
+++	}
+++
++ 	logger.Debug("checkAndSelfUpdate: starting update check (currentVersion=%s)", cfg.CurrentVersion)
++ 
++ 	if isOfficialContainer() {
+diff --git a/net/pangolin-newt/pkg-descr b/net/pangolin-newt/pkg-descr
+new file mode 100644
+--- /dev/null
++++ b/net/pangolin-newt/pkg-descr
+@@ -0,0 +1,6 @@
++Newt is a userspace WireGuard tunnel client and TCP/UDP proxy for Pangolin.
++It connects a private network to a Pangolin server without exposing the
++individual services directly to the Internet.
++
++This port builds the daemon from source. Automatic replacement of the
++installed executable is disabled; upgrades are managed through pkg.
+diff --git a/net/pangolin-newt/pkg-plist b/net/pangolin-newt/pkg-plist
+new file mode 100644
+--- /dev/null
++++ b/net/pangolin-newt/pkg-plist
+@@ -0,0 +1,3 @@
++bin/newt
++@sample(root,wheel,0600) %%ETCDIR%%/config.json.sample
++@dir(root,wheel,0700) %%ETCDIR%%

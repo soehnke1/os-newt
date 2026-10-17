@@ -1,0 +1,5 @@
+{
+  "opnsense/plugins": "a2a4b2de7aa343760f6d41c22152abf7a13f54ae",
+  "opnsense/core": "b0da0c35201a245caf75d7fc8f5e5e2a838aca7c",
+  "freebsd/freebsd-ports": "70c040120ef4ac0c0ffe8321c86f7ce4de172e2f"
+}

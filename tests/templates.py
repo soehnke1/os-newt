@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from jinja2 import Environment
 
-root = Path(__file__).resolve().parents[1] / 'src/opnsense/service/templates/OPNsense/Newt'
+root = Path(__file__).resolve().parents[1] / 'opnsense/security/newt/src/opnsense/service/templates/OPNsense/Newt'
 class Helpers:
     @staticmethod
     def exists(path):

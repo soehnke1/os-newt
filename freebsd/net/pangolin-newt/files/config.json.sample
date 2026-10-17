@@ -1,0 +1,7 @@
+{
+  "endpoint": "https://pangolin.example.com",
+  "id": "",
+  "secret": "",
+  "logLevel": "INFO",
+  "mtu": 1280
+}

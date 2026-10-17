@@ -1,0 +1,654 @@
+diff --git a/security/newt/+POST_DEINSTALL.post b/security/newt/+POST_DEINSTALL.post
+new file mode 100644
+--- /dev/null
++++ b/security/newt/+POST_DEINSTALL.post
+@@ -0,0 +1 @@
++rm -f /etc/rc.conf.d/newt
+diff --git a/security/newt/+POST_INSTALL.post b/security/newt/+POST_INSTALL.post
+new file mode 100644
+--- /dev/null
++++ b/security/newt/+POST_INSTALL.post
+@@ -0,0 +1,3 @@
++if grep -q 'newt_enable="YES"' /etc/rc.conf.d/newt; then
++    /usr/local/opnsense/scripts/OPNsense/Newt/service.sh restart
++fi
+diff --git a/security/newt/+PRE_DEINSTALL b/security/newt/+PRE_DEINSTALL
+new file mode 100644
+--- /dev/null
++++ b/security/newt/+PRE_DEINSTALL
+@@ -0,0 +1 @@
++/usr/local/opnsense/scripts/OPNsense/Newt/service.sh stop
+diff --git a/security/newt/+PRE_INSTALL b/security/newt/+PRE_INSTALL
+new file mode 100644
+--- /dev/null
++++ b/security/newt/+PRE_INSTALL
+@@ -0,0 +1 @@
++install -d -m 700 /usr/local/etc/newt
+diff --git a/security/newt/Makefile b/security/newt/Makefile
+new file mode 100644
+--- /dev/null
++++ b/security/newt/Makefile
+@@ -0,0 +1,8 @@
++PLUGIN_NAME=		newt
++PLUGIN_VERSION=		1.1
++PLUGIN_DEPENDS=		pangolin-newt
++PLUGIN_COMMENT=		Pangolin userspace WireGuard site connector
++PLUGIN_MAINTAINER=	mail@soehnke.de
++PLUGIN_WWW=		https://github.com/fosrl/newt
++
++.include "../../Mk/plugins.mk"
+diff --git a/security/newt/pkg-descr b/security/newt/pkg-descr
+new file mode 100644
+--- /dev/null
++++ b/security/newt/pkg-descr
+@@ -0,0 +1,3 @@
++Integrates the Pangolin Newt site connector into OPNsense with an MVC/API
++configuration page, service controls, and log viewer. Private resources
++and access policies are configured on the Pangolin server.
+diff --git a/security/newt/src/etc/inc/plugins.inc.d/newt.inc b/security/newt/src/etc/inc/plugins.inc.d/newt.inc
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/etc/inc/plugins.inc.d/newt.inc
+@@ -0,0 +1,28 @@
++<?php
++
++use OPNsense\Core\Backend;
++
++function newt_services()
++{
++    return [[
++        'name' => 'newt',
++        'description' => gettext('Pangolin Newt'),
++        'pidfile' => '/var/run/newt.pid',
++        'configd' => [
++            'start' => ['newt start'],
++            'stop' => ['newt stop'],
++            'restart' => ['newt restart'],
++        ],
++    ]];
++}
++
++function newt_configure()
++{
++    return ['bootup' => ['newt_configure_bootup']];
++}
++
++function newt_configure_bootup($verbose = false)
++{
++    // Runtime files may have been cleared during an upgrade or restoration.
++    (new Backend())->configdRun('template reload OPNsense/Newt');
++}
+diff --git a/security/newt/src/opnsense/mvc/app/controllers/OPNsense/Newt/Api/ServiceController.php b/security/newt/src/opnsense/mvc/app/controllers/OPNsense/Newt/Api/ServiceController.php
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/mvc/app/controllers/OPNsense/Newt/Api/ServiceController.php
+@@ -0,0 +1,36 @@
++<?php
++
++/*
++ * Copyright (c) 2026, Söhnke <mail@soehnke.de>
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without modification,
++ * are permitted provided that the following conditions are met:
++ * 1. Redistributions of source code must retain the above copyright notice, this
++ *    list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++namespace OPNsense\Newt\Api;
++
++use OPNsense\Base\ApiMutableServiceControllerBase;
++
++class ServiceController extends ApiMutableServiceControllerBase
++{
++    protected static $internalServiceClass = '\OPNsense\Newt\Newt';
++    protected static $internalServiceTemplate = 'OPNsense/Newt';
++    protected static $internalServiceEnabled = 'general.enabled';
++    protected static $internalServiceName = 'newt';
++}
+diff --git a/security/newt/src/opnsense/mvc/app/controllers/OPNsense/Newt/Api/SettingsController.php b/security/newt/src/opnsense/mvc/app/controllers/OPNsense/Newt/Api/SettingsController.php
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/mvc/app/controllers/OPNsense/Newt/Api/SettingsController.php
+@@ -0,0 +1,34 @@
++<?php
++
++/*
++ * Copyright (c) 2026, Söhnke <mail@soehnke.de>
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without modification,
++ * are permitted provided that the following conditions are met:
++ * 1. Redistributions of source code must retain the above copyright notice, this
++ *    list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++namespace OPNsense\Newt\Api;
++
++use OPNsense\Base\ApiMutableModelControllerBase;
++
++class SettingsController extends ApiMutableModelControllerBase
++{
++    protected static $internalModelClass = '\OPNsense\Newt\Newt';
++    protected static $internalModelName = 'newt';
++}
+diff --git a/security/newt/src/opnsense/mvc/app/controllers/OPNsense/Newt/IndexController.php b/security/newt/src/opnsense/mvc/app/controllers/OPNsense/Newt/IndexController.php
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/mvc/app/controllers/OPNsense/Newt/IndexController.php
+@@ -0,0 +1,37 @@
++<?php
++
++/*
++ * Copyright (c) 2026, Söhnke <mail@soehnke.de>
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without modification,
++ * are permitted provided that the following conditions are met:
++ * 1. Redistributions of source code must retain the above copyright notice, this
++ *    list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++namespace OPNsense\Newt;
++
++use OPNsense\Base\IndexController as BaseIndexController;
++
++class IndexController extends BaseIndexController
++{
++    public function indexAction()
++    {
++        $this->view->settingsForm = $this->getForm('settings');
++        $this->view->pick('OPNsense/Newt/index');
++    }
++}
+diff --git a/security/newt/src/opnsense/mvc/app/controllers/OPNsense/Newt/forms/settings.xml b/security/newt/src/opnsense/mvc/app/controllers/OPNsense/Newt/forms/settings.xml
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/mvc/app/controllers/OPNsense/Newt/forms/settings.xml
+@@ -0,0 +1,58 @@
++<form>
++    <field>
++        <type>header</type>
++        <label>Pangolin Newt</label>
++        <static>true</static>
++    </field>
++    <field>
++        <id>newt.general.enabled</id>
++        <label>Enable</label>
++        <type>checkbox</type>
++        <help>Start Newt automatically and connect this firewall to your Pangolin site.</help>
++    </field>
++    <field>
++        <id>newt.general.endpoint</id>
++        <label>Pangolin URL</label>
++        <type>text</type>
++        <help>HTTPS address of your Pangolin server.</help>
++    </field>
++    <field>
++        <id>newt.general.siteId</id>
++        <label>Site ID</label>
++        <type>text</type>
++        <help>Newt ID from the site configuration in Pangolin.</help>
++    </field>
++    <field>
++        <id>newt.general.secret</id>
++        <label>Site Secret</label>
++        <type>password</type>
++        <help>Site secret from Pangolin. Keep the existing value when continuing to use this site.</help>
++    </field>
++    <field>
++        <id>newt.general.logLevel</id>
++        <label>Log Level</label>
++        <type>dropdown</type>
++        <help>Use Info for normal operation and Debug for troubleshooting.</help>
++    </field>
++    <field>
++        <id>newt.general.mtu</id>
++        <label>MTU</label>
++        <type>text</type>
++        <advanced>true</advanced>
++        <help>Tunnel packet size. Keep 1280 unless your network requires another value.</help>
++    </field>
++    <field>
++        <id>newt.general.port</id>
++        <label>Client Tunnel Port</label>
++        <type>text</type>
++        <advanced>true</advanced>
++        <help>Optional fixed UDP listening port. Leave empty to choose automatically.</help>
++    </field>
++    <field>
++        <id>newt.general.dns</id>
++        <label>DNS Server</label>
++        <type>text</type>
++        <advanced>true</advanced>
++        <help>Optional DNS server for Newt to resolve its destinations. Leave empty to use the Newt default.</help>
++    </field>
++</form>
+diff --git a/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/ACL/ACL.xml b/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/ACL/ACL.xml
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/ACL/ACL.xml
+@@ -0,0 +1,10 @@
++<acl>
++    <page-newt-settings>
++        <name>VPN: Pangolin Newt: Settings and Service</name>
++        <patterns><pattern>ui/newt/*</pattern><pattern>api/newt/*</pattern></patterns>
++    </page-newt-settings>
++    <page-newt-log>
++        <name>VPN: Pangolin Newt: Log File</name>
++        <patterns><pattern>ui/diagnostics/log/core/newt/*</pattern><pattern>api/diagnostics/log/core/newt/*</pattern></patterns>
++    </page-newt-log>
++</acl>
+diff --git a/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Menu/Menu.xml b/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Menu/Menu.xml
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Menu/Menu.xml
+@@ -0,0 +1,8 @@
++<menu>
++    <VPN>
++        <Newt VisibleName="Pangolin Newt" cssClass="fa fa-exchange fa-fw" order="80">
++            <Settings VisibleName="Settings" order="10" url="/ui/newt/"/>
++            <Log VisibleName="Log File" order="20" url="/ui/diagnostics/log/core/newt"/>
++        </Newt>
++    </VPN>
++</menu>
+diff --git a/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Migrations/M1_0_0.php b/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Migrations/M1_0_0.php
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Migrations/M1_0_0.php
+@@ -0,0 +1,70 @@
++<?php
++
++/*
++ * Copyright (c) 2026, Söhnke <mail@soehnke.de>
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without modification,
++ * are permitted provided that the following conditions are met:
++ * 1. Redistributions of source code must retain the above copyright notice, this
++ *    list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++namespace OPNsense\Newt\Migrations;
++
++use OPNsense\Base\BaseModelMigration;
++use OPNsense\Core\Syslog;
++use OPNsense\Newt\Newt;
++
++// phpcs:ignore Squiz.Classes.ValidClassName.NotCamelCaps -- OPNsense migration class naming convention.
++class M1_0_0 extends BaseModelMigration
++{
++    public function run($model)
++    {
++        parent::run($model);
++        if (!$model instanceof Newt || $model->general->siteId->isSet()) {
++            return;
++        }
++        $path = '/usr/local/etc/newt/config.json';
++        if (!is_readable($path)) {
++            return;
++        }
++        $legacy = json_decode(file_get_contents($path), true);
++        if (!is_array($legacy) || empty($legacy['id']) || empty($legacy['secret']) || empty($legacy['endpoint'])) {
++            return;
++        }
++        $mapping = ['endpoint' => 'endpoint', 'siteId' => 'id', 'secret' => 'secret',
++            'logLevel' => 'logLevel', 'mtu' => 'mtu', 'port' => 'port', 'dns' => 'dns'];
++        $previous = [];
++        foreach ($mapping as $field => $key) {
++            $previous[$field] = (string)$model->general->$field;
++            if (isset($legacy[$key]) && is_scalar($legacy[$key])) {
++                $model->general->$field = (string)$legacy[$key];
++            }
++        }
++        $previous['enabled'] = (string)$model->general->enabled;
++        $rcFile = '/etc/rc.conf.d/newt';
++        $rc = is_readable($rcFile) ? file_get_contents($rcFile) : '';
++        $model->general->enabled = preg_match('/newt_enable=["\x27]?YES/i', $rc) ? '1' : '0';
++        if (count($model->performValidation(true))) {
++            foreach ($previous as $field => $value) {
++                $model->general->$field = $value;
++            }
++            (new Syslog('newt'))->warning('Legacy Newt settings failed validation and were not imported.');
++        }
++    }
++}
+diff --git a/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Newt.php b/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Newt.php
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Newt.php
+@@ -0,0 +1,33 @@
++<?php
++
++/*
++ * Copyright (c) 2026, Söhnke <mail@soehnke.de>
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without modification,
++ * are permitted provided that the following conditions are met:
++ * 1. Redistributions of source code must retain the above copyright notice, this
++ *    list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++namespace OPNsense\Newt;
++
++use OPNsense\Base\BaseModel;
++
++class Newt extends BaseModel
++{
++}
+diff --git a/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Newt.xml b/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Newt.xml
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/mvc/app/models/OPNsense/Newt/Newt.xml
+@@ -0,0 +1,74 @@
++<model>
++    <mount>//OPNsense/Newt</mount>
++    <version>1.0.0</version>
++    <description>Pangolin Newt site connector</description>
++    <items>
++        <general>
++            <enabled type="BooleanField">
++                <Default>0</Default>
++                <Required>Y</Required>
++            </enabled>
++            <endpoint type="TextField">
++                <Mask>#^https://(?:\[[0-9A-Fa-f:]+\]|[A-Za-z0-9.-]+)(?::[0-9]{1,5})?/?$#D</Mask>
++                <ValidationMessage>Enter an HTTPS Pangolin server address, for example https://pangolin.example.com.</ValidationMessage>
++                <Constraints>
++                    <check001>
++                        <ValidationMessage>This field is required when Newt is enabled.</ValidationMessage>
++                        <type>SetIfConstraint</type>
++                        <field>enabled</field>
++                        <check>1</check>
++                    </check001>
++                </Constraints>
++            </endpoint>
++            <siteId type="TextField">
++                <Mask>#^[A-Za-z0-9_-]{1,128}$#D</Mask>
++                <ValidationMessage>Enter the Newt site ID from Pangolin.</ValidationMessage>
++                <Constraints>
++                    <check001>
++                        <ValidationMessage>This field is required when Newt is enabled.</ValidationMessage>
++                        <type>SetIfConstraint</type>
++                        <field>enabled</field>
++                        <check>1</check>
++                    </check001>
++                </Constraints>
++            </siteId>
++            <secret type="TextField">
++                <Mask>#^\S{1,512}$#D</Mask>
++                <ValidationMessage>Enter the site secret without whitespace (up to 512 characters).</ValidationMessage>
++                <Constraints>
++                    <check001>
++                        <ValidationMessage>This field is required when Newt is enabled.</ValidationMessage>
++                        <type>SetIfConstraint</type>
++                        <field>enabled</field>
++                        <check>1</check>
++                    </check001>
++                </Constraints>
++            </secret>
++            <logLevel type="OptionField">
++                <Default>INFO</Default>
++                <Required>Y</Required>
++                <OptionValues>
++                    <INFO>Info</INFO>
++                    <WARN>Warning</WARN>
++                    <ERROR>Error</ERROR>
++                    <DEBUG>Debug</DEBUG>
++                </OptionValues>
++            </logLevel>
++            <mtu type="IntegerField">
++                <Default>1280</Default>
++                <Required>Y</Required>
++                <MinimumValue>1280</MinimumValue>
++                <MaximumValue>9000</MaximumValue>
++                <ValidationMessage>MTU must be between 1280 and 9000.</ValidationMessage>
++            </mtu>
++            <port type="IntegerField">
++                <MinimumValue>1</MinimumValue>
++                <MaximumValue>65535</MaximumValue>
++            </port>
++            <dns type="NetworkField">
++                <AddressFamily>ipv4,ipv6</AddressFamily>
++                <NetMaskAllowed>N</NetMaskAllowed>
++            </dns>
++        </general>
++    </items>
++</model>
+diff --git a/security/newt/src/opnsense/mvc/app/views/OPNsense/Newt/index.volt b/security/newt/src/opnsense/mvc/app/views/OPNsense/Newt/index.volt
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/mvc/app/views/OPNsense/Newt/index.volt
+@@ -0,0 +1,43 @@
++{#
++Copyright (c) 2026, Söhnke <mail@soehnke.de>
++All rights reserved.
++
++Redistribution and use in source and binary forms, with or without modification,
++are permitted provided that the following conditions are met:
++1. Redistributions of source code must retain the above copyright notice, this
++   list of conditions and the following disclaimer.
++2. Redistributions in binary form must reproduce the above copyright notice,
++   this list of conditions and the following disclaimer in the documentation
++   and/or other materials provided with the distribution.
++
++THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++OF THE POSSIBILITY OF SUCH DAMAGE.
++#}
++<script>
++$(document).ready(function () {
++    mapDataToFormUI({'frmNewt': '/api/newt/settings/get'}).done(function () {
++        $('.selectpicker').selectpicker('refresh');
++        updateServiceControlUI('newt');
++    });
++    $('#reconfigureAct').SimpleActionButton({
++        onPreAction: function () {
++            var deferred = $.Deferred();
++            saveFormToEndpoint('/api/newt/settings/set', 'frmNewt', deferred.resolve, true, deferred.reject);
++            return deferred;
++        },
++        onAction: function () { updateServiceControlUI('newt'); }
++    });
++});
++</script>
++<div class="content-box">
++    {{ partial('layout_partials/base_form', ['fields': settingsForm, 'id': 'frmNewt']) }}
++</div>
++{{ partial('layout_partials/base_apply_button', {'data_endpoint': '/api/newt/service/reconfigure', 'data_service_widget': 'newt'}) }}
+diff --git a/security/newt/src/opnsense/scripts/OPNsense/Newt/service.sh b/security/newt/src/opnsense/scripts/OPNsense/Newt/service.sh
+new file mode 100755
+--- /dev/null
++++ b/security/newt/src/opnsense/scripts/OPNsense/Newt/service.sh
+@@ -0,0 +1,46 @@
++#!/bin/sh
++
++# Copyright (c) 2026, Söhnke <mail@soehnke.de>
++# All rights reserved.
++#
++# Redistribution and use in source and binary forms, with or without modification,
++# are permitted provided that the following conditions are met:
++# 1. Redistributions of source code must retain the above copyright notice, this
++#    list of conditions and the following disclaimer.
++# 2. Redistributions in binary form must reproduce the above copyright notice,
++#    this list of conditions and the following disclaimer in the documentation
++#    and/or other materials provided with the distribution.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++# IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++# INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++# OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++# OF THE POSSIBILITY OF SUCH DAMAGE.
++
++set -eu
++rc=/usr/local/etc/rc.d/newt
++case "${1:-}" in
++    start) "$rc" start ;;
++    stop)
++        if "$rc" onestatus >/dev/null 2>&1; then "$rc" onestop; fi
++        ;;
++    restart)
++        if "$rc" onestatus >/dev/null 2>&1; then "$rc" onestop; fi
++        "$rc" start
++        ;;
++    status)
++        if "$rc" onestatus >/dev/null 2>&1 &&
++            [ -s /var/run/newt.child.pid ] &&
++            kill -0 "$(cat /var/run/newt.child.pid)" 2>/dev/null; then
++            "$rc" onestatus
++        else
++            echo 'newt is not running.'
++        fi
++        ;;
++    *) echo 'Usage: service.sh {start|stop|restart|status}' >&2; exit 1 ;;
++esac
+diff --git a/security/newt/src/opnsense/service/conf/actions.d/actions_newt.conf b/security/newt/src/opnsense/service/conf/actions.d/actions_newt.conf
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/service/conf/actions.d/actions_newt.conf
+@@ -0,0 +1,24 @@
++[start]
++command:/usr/local/opnsense/scripts/OPNsense/Newt/service.sh start
++parameters:
++type:script
++message:Starting Pangolin Newt
++
++[stop]
++command:/usr/local/opnsense/scripts/OPNsense/Newt/service.sh stop
++parameters:
++type:script
++message:Stopping Pangolin Newt
++
++[restart]
++command:/usr/local/opnsense/scripts/OPNsense/Newt/service.sh restart
++parameters:
++type:script
++message:Restarting Pangolin Newt
++
++[status]
++command:/usr/local/opnsense/scripts/OPNsense/Newt/service.sh status
++parameters:
++type:script_output
++errors:no
++message:Requesting Pangolin Newt status
+diff --git a/security/newt/src/opnsense/service/templates/OPNsense/Newt/+TARGETS b/security/newt/src/opnsense/service/templates/OPNsense/Newt/+TARGETS
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/service/templates/OPNsense/Newt/+TARGETS
+@@ -0,0 +1,2 @@
++rc.conf.d:/etc/rc.conf.d/newt
++config.json:/usr/local/etc/newt/config.json
+diff --git a/security/newt/src/opnsense/service/templates/OPNsense/Newt/config.json b/security/newt/src/opnsense/service/templates/OPNsense/Newt/config.json
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/service/templates/OPNsense/Newt/config.json
+@@ -0,0 +1,14 @@
++{% if helpers.exists('OPNsense.Newt.general') %}
++{% set cfg = OPNsense.Newt.general %}
++{
++  "endpoint": {{ cfg.endpoint|default('')|tojson }},
++  "id": {{ cfg.siteId|default('')|tojson }},
++  "secret": {{ cfg.secret|default('')|tojson }},
++  "logLevel": {{ cfg.logLevel|default('INFO')|tojson }},
++  "mtu": {{ cfg.mtu|default('1280')|int }}{% if cfg.port|default('') %},
++  "port": {{ cfg.port|int }}{% endif %}{% if cfg.dns|default('') %},
++  "dns": {{ cfg.dns|tojson }}{% endif %}
++}
++{% else %}
++{}
++{% endif %}
+diff --git a/security/newt/src/opnsense/service/templates/OPNsense/Newt/rc.conf.d b/security/newt/src/opnsense/service/templates/OPNsense/Newt/rc.conf.d
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/service/templates/OPNsense/Newt/rc.conf.d
+@@ -0,0 +1 @@
++newt_enable="{{ 'YES' if helpers.exists('OPNsense.Newt.general.enabled') and OPNsense.Newt.general.enabled == '1' else 'NO' }}"
+diff --git a/security/newt/src/opnsense/service/templates/OPNsense/Syslog/local/newt.conf b/security/newt/src/opnsense/service/templates/OPNsense/Syslog/local/newt.conf
+new file mode 100644
+--- /dev/null
++++ b/security/newt/src/opnsense/service/templates/OPNsense/Syslog/local/newt.conf
+@@ -0,0 +1,4 @@
++# Pangolin Newt
++filter f_local_newt {
++    program("newt");
++};

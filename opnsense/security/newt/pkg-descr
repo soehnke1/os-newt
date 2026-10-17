@@ -1,0 +1,3 @@
+Integrates the Pangolin Newt site connector into OPNsense with an MVC/API
+configuration page, service controls, and log viewer. Private resources
+and access policies are configured on the Pangolin server.

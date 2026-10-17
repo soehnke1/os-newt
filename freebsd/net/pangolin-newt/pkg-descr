@@ -1,0 +1,6 @@
+Newt is a userspace WireGuard tunnel client and TCP/UDP proxy for Pangolin.
+It connects a private network to a Pangolin server without exposing the
+individual services directly to the Internet.
+
+This port builds the daemon from source. Automatic replacement of the
+installed executable is disabled; upgrades are managed through pkg.
