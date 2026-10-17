@@ -108,6 +108,8 @@ Die Weboberfläche neu laden und Folgendes prüfen:
 
 Auf dem iPhone WLAN ausschalten, den Pangolin-Client mit der passenden Organisation verbinden und einen freigegebenen internen Dienst aufrufen. Dafür müssen das LAN-Netz beziehungsweise die Ressource der richtigen Site zugeordnet und die Zugriffsrechte im Pangolin-Server eingerichtet sein.
 
+Falls der Client während des Paketwechsels oder der Diensttests bereits verbunden war und der Zugriff scheitert, die Verbindung im Pangolin-Client trennen und neu aufbauen. Beim Live-Test von v1.1-rc1 funktionierte der iPhone-Zugriff erst nach diesem erneuten Verbinden. Ein automatischer Wiederaufbau einer bestehenden Client-Verbindung nach einem Newt-Neustart ist damit nicht bestätigt.
+
 Beispiel für einen Switch, dessen Oberfläche nur HTTP unterstützt:
 
 ```text
