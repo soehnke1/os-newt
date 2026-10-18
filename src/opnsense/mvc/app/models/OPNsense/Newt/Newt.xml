@@ -6,17 +6,34 @@
         <general>
             <enabled type="BooleanField"><Default>0</Default><Required>Y</Required></enabled>
             <endpoint type="TextField">
-                <Required>Y</Required>
                 <Mask>#^https://(?:\[[0-9A-Fa-f:]+\]|[A-Za-z0-9.-]+)(?::[0-9]{1,5})?/?$#D</Mask>
                 <ValidationMessage>Enter an HTTPS Pangolin server address, for example https://pangolin.example.com.</ValidationMessage>
+                <Constraints>
+                    <requiredWhenEnabled>
+                        <ValidationMessage>This field is required when Newt is enabled.</ValidationMessage>
+                        <type>SetIfConstraint</type><field>enabled</field><check>1</check>
+                    </requiredWhenEnabled>
+                </Constraints>
             </endpoint>
             <siteId type="TextField">
-                <Required>Y</Required><Mask>#^[A-Za-z0-9_-]{1,128}$#D</Mask>
+                <Mask>#^[A-Za-z0-9_-]{1,128}$#D</Mask>
                 <ValidationMessage>Enter the Newt site ID from Pangolin.</ValidationMessage>
+                <Constraints>
+                    <requiredWhenEnabled>
+                        <ValidationMessage>This field is required when Newt is enabled.</ValidationMessage>
+                        <type>SetIfConstraint</type><field>enabled</field><check>1</check>
+                    </requiredWhenEnabled>
+                </Constraints>
             </siteId>
             <secret type="TextField">
-                <Required>Y</Required><Mask>#^\S{1,512}$#D</Mask>
+                <Mask>#^\S{1,512}$#D</Mask>
                 <ValidationMessage>Enter the site secret without whitespace (up to 512 characters).</ValidationMessage>
+                <Constraints>
+                    <requiredWhenEnabled>
+                        <ValidationMessage>This field is required when Newt is enabled.</ValidationMessage>
+                        <type>SetIfConstraint</type><field>enabled</field><check>1</check>
+                    </requiredWhenEnabled>
+                </Constraints>
             </secret>
             <logLevel type="OptionField">
                 <Default>INFO</Default><Required>Y</Required>

@@ -32,4 +32,15 @@ $model->general->dns = '';
 if (count($model->performValidation())) {
     throw new RuntimeException('Empty optional values must be accepted.');
 }
+$model->general->enabled = '0';
+foreach (['endpoint', 'siteId', 'secret'] as $field) {
+    $model->general->$field = '';
+}
+if (count($model->performValidation())) {
+    throw new RuntimeException('Disabled, unconfigured plugin must be accepted.');
+}
+$model->general->enabled = '1';
+if (!count($model->performValidation())) {
+    throw new RuntimeException('Enabled plugin must require credentials.');
+}
 echo "Model validation checks passed.\n";

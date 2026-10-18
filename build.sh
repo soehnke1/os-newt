@@ -4,6 +4,7 @@
 set -eu
 umask 022
 [ "$(uname -s)" = FreeBSD ] || { echo 'Build on FreeBSD/OPNsense.' >&2; exit 1; }
+command -v opnsense-version >/dev/null 2>&1 || { echo 'OPNsense is required.' >&2; exit 1; }
 source_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 build=$(mktemp -d /tmp/os-newt-build.XXXXXX)
 trap 'rm -rf "$build"' EXIT
@@ -12,19 +13,14 @@ stage="$build/stage"
 metadata="$build/metadata"
 mkdir -p "$stage/usr/local" "$metadata" "$source_dir/dist"
 cp -R "$source_dir/src/" "$stage/usr/local/"
-case "$(uname -m)" in
-    amd64) arch=amd64; digest=d2e12ca03ba060ab8c97ee827359d54c1fb6428ea5bf7f1bc9b500236d6cebc2 ;;
-    arm64|aarch64) arch=arm64; digest=5c02e3fb3726a1c251f63edee21cadf62b1cc9fa2aee111b4c80d9358ff8be05 ;;
-    *) echo 'Unsupported architecture.' >&2; exit 1 ;;
-esac
-mkdir -p "$stage/usr/local/sbin" "$stage/usr/local/share/doc/os-newt" "$stage/usr/local/opnsense/version"
-fetch -o "$stage/usr/local/sbin/newt" "https://github.com/fosrl/newt/releases/download/1.18.1/newt_freebsd_${arch}"
-[ "$(sha256 -q "$stage/usr/local/sbin/newt")" = "$digest" ] || { echo 'Newt checksum mismatch.' >&2; exit 1; }
-fetch -o "$stage/usr/local/share/doc/os-newt/LICENSE.newt" 'https://raw.githubusercontent.com/fosrl/newt/1.18.1/LICENSE'
+# Ignore Finder/AppleDouble metadata when sources were copied from macOS.
+find "$stage" -type f \( -name '._*' -o -name '.DS_Store' \) -delete
+arch=$(uname -p)
+mkdir -p "$stage/usr/local/share/doc/os-newt" "$stage/usr/local/opnsense/version"
 cp "$source_dir/LICENSE" "$source_dir/README.md" "$stage/usr/local/share/doc/os-newt/"
 find "$stage" -type d -exec chmod 755 {} +
 find "$stage" -type f -exec chmod 644 {} +
-chmod 755 "$stage/usr/local/sbin/newt" "$stage/usr/local/etc/rc.d/newt"
+chmod 755 "$stage/usr/local/etc/rc.d/newt"
 chmod 755 "$stage/usr/local/opnsense/scripts/OPNsense/Newt/"*
 
 export NEWT_BUILD_STAGE="$stage" NEWT_BUILD_METADATA="$metadata" NEWT_BUILD_ARCH="$arch"
@@ -32,19 +28,21 @@ php <<'PHP'
 <?php
 $annotations = [
     'product_id' => 'os-newt', 'product_name' => 'newt',
-    'product_version' => '1.0', 'product_tier' => '4',
+    'product_version' => '1.2', 'product_tier' => '4',
+    'product_conflicts' => 'os-newt-devel',
     'product_abi' => trim(shell_exec('opnsense-version -a')),
     'product_arch' => getenv('NEWT_BUILD_ARCH'),
     'product_website' => 'https://github.com/fosrl/newt',
-    'product_email' => 'local@localhost',
+    'product_email' => 'soehnke.dencker@sh4u.de',
 ];
 $manifest = [
-    'name' => 'os-newt', 'version' => '1.0', 'origin' => 'local/os-newt',
+    'name' => 'os-newt', 'version' => '1.2', 'origin' => 'local/os-newt',
     'comment' => 'Pangolin Newt connector with WebUI and service controls',
-    'desc' => 'Locally maintained OPNsense plugin. Bundles official Newt 1.18.1.',
-    'maintainer' => 'local@localhost', 'www' => 'https://github.com/fosrl/newt',
+    'desc' => 'Pangolin Newt MVC/API integration; requires the separate pangolin-newt package.',
+    'maintainer' => 'soehnke.dencker@sh4u.de', 'www' => 'https://github.com/fosrl/newt',
     'prefix' => '/usr/local', 'categories' => ['net', 'security'],
-    'licenselogic' => 'multi', 'licenses' => ['BSD2CLAUSE', 'AGPLv3'],
+    'licenselogic' => 'single', 'licenses' => ['BSD2CLAUSE'],
+    'deps' => ['pangolin-newt' => ['origin' => 'net/pangolin-newt', 'version' => '1.18.1']],
     'abi' => trim(shell_exec('pkg config ABI')),
     'annotations' => $annotations,
     'scripts' => [
@@ -60,3 +58,4 @@ PHP
 find "$stage/usr/local" -type f | sed "s|^$stage/usr/local/||" | sort > "$build/plist"
 pkg create -r "$stage" -m "$metadata" -p "$build/plist" -o "$source_dir/dist"
 echo "Package written to $source_dir/dist"
+(cd "$source_dir/dist" && sha256 -r os-newt-1.2.pkg > SHA256SUMS.plugin)
